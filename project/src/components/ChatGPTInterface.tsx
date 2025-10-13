@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, User, Bot, Copy, LogOut, Menu, X } from 'lucide-react';
 import { ChatSidebar } from './ChatSidebar';
 import { Message } from '../types/chat';
+import { BaseUrl } from '../config/config.js';
 
 interface Conversation {
   id: string;
@@ -55,7 +56,7 @@ export const ChatGPTInterface: React.FC = () => {
       const token = localStorage.getItem('authToken');
       if (!token) return;
 
-      const response = await fetch('http://localhost:5000/api/conversations', {
+      const response = await fetch(`${BaseUrl}/api/conversations`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -84,7 +85,7 @@ export const ChatGPTInterface: React.FC = () => {
   const loadMessages = async (conversationId: string) => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5000/api/conversations/${conversationId}/messages`, {
+      const response = await fetch(`${BaseUrl}/api/conversations/${conversationId}/messages`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -111,7 +112,7 @@ export const ChatGPTInterface: React.FC = () => {
   const createNewConversationAndReturnId = async (): Promise<string | null> => {
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch("http://localhost:5000/api/conversations", {
+      const response = await fetch(`${BaseUrl}/api/conversations`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ title: "New Chat" }),
@@ -173,7 +174,7 @@ const sendMessage = async (content: string) => {
         .trim();
 
       // Send image prompt to Stability API backend route
-      const response = await fetch("http://localhost:5000/api/generate-image", {
+      const response = await fetch(`${BaseUrl}/api/generate-image`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -196,7 +197,7 @@ const sendMessage = async (content: string) => {
         role: m.role,
         content: m.content,
       }));
-      const response = await fetch("http://localhost:5000/api/search", {
+      const response = await fetch(`${BaseUrl}/api/search`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

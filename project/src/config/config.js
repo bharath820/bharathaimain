@@ -1,0 +1,1 @@
+export const BaseUrl = `https://bharathaimain-1.onrender.com`

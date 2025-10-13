@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Mail, Phone, User, Shield, Clock } from 'lucide-react';
+import {BaseUrl} from '../config/config.js';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -40,7 +41,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuc
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5000/send-otp', {
+      const response = await fetch(`${BaseUrl}/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -71,7 +72,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuc
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5000/verify-otp', {
+      const response = await fetch(`${BaseUrl}/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

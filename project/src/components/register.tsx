@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Mail, Shield, Lock, ArrowRight, Sparkles, CheckCircle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { BaseUrl } from '../config/config.js';
 
 const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -47,7 +48,7 @@ const RegisterPage: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/send-otp", {
+      const res = await fetch(`${BaseUrl}/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
@@ -81,7 +82,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
   }
 
   try {
-    const res = await fetch("http://localhost:5000/verify-otp", {
+    const res = await fetch(`${BaseUrl}/verify-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -115,7 +116,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
     setIsLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/send-otp", {
+      const res = await fetch(`${BaseUrl}/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),

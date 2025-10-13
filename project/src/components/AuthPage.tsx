@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Mail, Shield, ArrowRight, Sparkles, Zap } from 'lucide-react';
 import { ChatGPTInterface } from './ChatGPTInterface';
 import { useNavigate, useLocation } from "react-router-dom";
+import { BaseUrl } from '../config/config.js';
 
 export const AuthPage: React.FC = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -33,7 +34,7 @@ export const AuthPage: React.FC = () => {
   setError('');
 
   try {
-    const response = await fetch('http://localhost:5000/api/auth/login', {
+    const response = await fetch(`${BaseUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
