@@ -41,7 +41,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuc
     setError('');
 
     try {
-      const response = await fetch(`${BaseUrl}/send-otp`, {
+      const response = await fetch(`${BaseUrl}/api/auth/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -72,7 +72,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuc
     setError('');
 
     try {
-      const response = await fetch(`${BaseUrl}/verify-otp`, {
+      const response = await fetch(`${BaseUrl}/api/auth/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

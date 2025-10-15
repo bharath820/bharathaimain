@@ -4,34 +4,42 @@ import cors from "cors";
 import { config } from "./config.js";
 import authRoutes from "./routes/auth.js";
 import chatRoutes from "./routes/chat.js";
+import dotenv from "dotenv";
 const app = express();
 
-app.use(cors());
+dotenv.config();
+
+
 app.use(express.json());
+
+const allowedOrigins = [process.env.FRONTEND_ORIGIN || "http://localhost:5173"];
+
+
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
+
+
+
 
 // Health check
 app.get('/api/check', (req, res) => res.json({ status: 'ok' }));
 
 mongoose.connect(config.MONGO_URI)
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB error:", err));
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.error("MongoDB error:", err));
 
 app.use("/api/auth", authRoutes);
 app.use('/api', chatRoutes);
 
 // Fallback for non-existent routes (404 as JSON)
 app.get("/", (req, res) => res.send("API running"));
+
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 
-
-
-
-// app.use(cors({
-//     origin: ['','http://localhost:5000'],
-//     credentials: true
-// }));
-
-console.log("CORS enabled for specific origins");
+console.log("CORS enabled for frontend origins");
 
 
 

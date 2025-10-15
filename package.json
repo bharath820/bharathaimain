@@ -12,8 +12,17 @@
   "devDependencies": {
     "concurrently": "^8.2.2"
   },
-  "keywords": ["otp", "registration", "react", "nodejs", "mongodb"],
+  "keywords": [
+    "otp",
+    "registration",
+    "react",
+    "nodejs",
+    "mongodb"
+  ],
   "author": "Bharat AI",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  }
 }
-

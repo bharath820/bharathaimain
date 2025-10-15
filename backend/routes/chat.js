@@ -5,7 +5,7 @@ import Message from "../models/Message.js";
 import jwt from "jsonwebtoken";
 import { config } from "../config.js";
 import OpenAI from "openai";
-
+import fetch from 'node-fetch';
 const router = express.Router();
 
 // 🔐 JWT Auth Middleware
@@ -20,6 +20,11 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+const openai = new OpenAI({
+  apiKey: config.OPENROUTER_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+});
 
 // 📋 GET all conversations
 router.get("/conversations", authenticateToken, async (req, res) => {
@@ -67,30 +72,14 @@ router.post("/search", authenticateToken, async (req, res) => {
   try {
     const { messages, conversationId } = req.body;
 
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({ error: "Messages array required" });
-    }
+    if (!messages?.length) return res.status(400).json({ error: "Messages required" });
 
-    // 🧩 Find or create conversation
-    let conv;
-    if (conversationId) {
-      conv = await Conversation.findOne({
-        _id: conversationId,
-        user: req.user.id,
-      });
-      if (!conv) return res.status(404).json({ error: "Conversation not found" });
-      conv.updatedAt = new Date();
-      await conv.save();
-    } else {
-      conv = await Conversation.create({ user: req.user.id, title: "New Chat" });
-    }
+    // find/create conversation
+    let conv = await Conversation.findOne({ _id: conversationId, user: req.user.id });
+    if (!conv) conv = await Conversation.create({ user: req.user.id, title: "New Chat" });
 
-    // 🗣️ Save user message
+    // save user message
     const userMsg = messages[messages.length - 1];
-    if (userMsg.role !== "user") {
-      return res.status(400).json({ error: "Last message must be from user" });
-    }
-
     await Message.create({
       conversation: conv._id,
       role: "user",
@@ -98,42 +87,17 @@ router.post("/search", authenticateToken, async (req, res) => {
       timestamp: new Date(),
     });
 
-    // ✅ Validate OpenRouter API key
-    if (!config.OPENROUTER_API_KEY) {
-      console.error("❌ Missing OpenRouter API key");
-      return res.status(500).json({ 
-        error: "OpenRouter API key not configured. Please add OPENROUTER_API_KEY to your .env file." 
-      });
-    }
-
-    // Validate API key format
-    if (!config.OPENROUTER_API_KEY.startsWith('sk-or-')) {
-      console.error("❌ Invalid OpenRouter API key format");
-      return res.status(500).json({ 
-        error: "Invalid OpenRouter API key format. API key should start with 'sk-or-'." 
-      });
-    }
-
-    // ⚙️ Initialize OpenRouter client
-    const openai = new OpenAI({
-      apiKey: config.OPENROUTER_API_KEY,
-      baseURL: "https://openrouter.ai/api/v1",
-    });
-
-    console.log("📤 Sending to OpenRouter:", userMsg.content);
-
-    // ✅ Use a valid OpenRouter model ID with proper configuration
+    // send to OpenRouter
     const completion = await openai.chat.completions.create({
-      model: "openai/gpt-4o-mini", // Cost-effective model
+      model: "openai/gpt-4o-mini",
       messages,
       max_tokens: 1000,
       temperature: 0.7,
     });
 
-    const aiText =
-      completion.choices?.[0]?.message?.content || "⚠️ No AI response received";
+    const aiText = completion.choices?.[0]?.message?.content || "⚠️ No response";
 
-    // 💾 Save AI response
+    // save assistant message
     await Message.create({
       conversation: conv._id,
       role: "assistant",
@@ -143,89 +107,95 @@ router.post("/search", authenticateToken, async (req, res) => {
 
     res.json({ result: aiText, conversationId: conv._id });
   } catch (err) {
-    console.error("🔥 Error in /search:", err.response?.data || err.message);
-    
-    // Handle specific OpenRouter API errors
-    if (err.response?.status === 401) {
-      return res.status(500).json({
-        error: "Invalid OpenRouter API key. Please check your API key and try again."
-      });
-    } else if (err.response?.status === 429) {
-      return res.status(500).json({
-        error: "Rate limit exceeded. Please wait a moment and try again."
-      });
-    } else if (err.response?.status === 402) {
-      return res.status(500).json({
-        error: "Insufficient credits. Please add credits to your OpenRouter account."
-      });
-    } else if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
-      return res.status(500).json({
-        error: "Network error. Please check your internet connection and try again."
-      });
-    }
-    
-    // Generic error handling
-    const errorMessage = err.response?.data?.error?.message || 
-                        err.message || 
-                        "Failed to get AI response from OpenRouter";
-    
-    res.status(500).json({
-      error: errorMessage
-    });
+    console.error("🔥 /search error:", err);
+    res.status(500).json({ error: err.message || "OpenRouter text generation failed" });
   }
 });
+
 
 
 router.post("/generate-image", authenticateToken, async (req, res) => {
   try {
     const { prompt, conversationId } = req.body;
-    if (!prompt) return res.status(400).json({ error: "Prompt required" });
-    if (!conversationId) return res.status(400).json({ error: "conversationId required" });
+    if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
+    // Check if Stability AI key is configured
     if (!config.STABILITY_API_KEY) {
-      return res.status(500).json({ error: "Stability API key not configured" });
+      return res.status(500).json({ error: "Stability AI API key not configured" });
     }
 
-    // Call Stability API
-    const response = await fetch("https://api.stability.ai/v1/generation/stable-diffusion-768x768/text-to-image", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config.STABILITY_API_KEY}`,
-      },
-      body: JSON.stringify({
-        text_prompts: [{ text: prompt }],
-        cfg_scale: 7,
-        height: 768,
-        width: 768,
-        samples: 1,
-        steps: 30,
-      }),
+    // find or create conversation
+    let conv = await Conversation.findOne({ _id: conversationId, user: req.user.id });
+    if (!conv) conv = await Conversation.create({ user: req.user.id, title: "Image Chat" });
+
+    // save user message
+    await Message.create({
+      conversation: conv._id,
+      role: "user",
+      content: prompt,
+      timestamp: new Date(),
     });
 
-    const data = await response.json();
+    console.log("🎨 Generating image with prompt:", prompt);
 
-    if (data.artifacts && data.artifacts.length > 0) {
-      const imageBase64 = data.artifacts[0].base64;
-      const imageUrl = `data:image/png;base64,${imageBase64}`;
+    // Call Stability AI API directly
+    const stabilityResponse = await fetch(
+      'https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.STABILITY_API_KEY}`,
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          text_prompts: [
+            {
+              text: prompt,
+              weight: 1
+            }
+          ],
+          cfg_scale: 7,
+          height: 1024,
+          width: 1024,
+          samples: 1,
+          steps: 30,
+        }),
+      }
+    );
 
-      // Save assistant's image reply to the chat history
-      await Message.create({
-        conversation: conversationId,
-        role: "assistant",
-        content: `Here's the image you requested:`, // Optional short caption
-        imageUrl,
-        isImage: true,
-        timestamp: new Date(),
-      });
-
-      res.json({ imageUrl });
-    } else {
-      res.status(500).json({ error: "Failed to generate image" });
+    if (!stabilityResponse.ok) {
+      const errorData = await stabilityResponse.json().catch(() => ({}));
+      console.error("❌ Stability AI API error:", errorData);
+      throw new Error(`Stability AI API error: ${stabilityResponse.status} ${stabilityResponse.statusText}`);
     }
+
+    const stabilityData = await stabilityResponse.json();
+    console.log("✅ Stability AI response received");
+
+    if (!stabilityData.artifacts || stabilityData.artifacts.length === 0) {
+      throw new Error("No image generated by Stability AI");
+    }
+
+    // Convert base64 image to data URL
+    const imageBase64 = stabilityData.artifacts[0].base64;
+    const imageUrl = `data:image/png;base64,${imageBase64}`;
+
+    // save assistant image message
+    await Message.create({
+      conversation: conv._id,
+      role: "assistant",
+      content: `Here's the image you requested:`,
+      imageUrl,
+      isImage: true,
+      timestamp: new Date(),
+    });
+
+    console.log("✅ Image generation completed successfully");
+    res.json({ imageUrl, conversationId: conv._id });
   } catch (err) {
-    console.error("Image generation error:", err);
-    res.status(500).json({ error: "Failed to generate image" });
+    console.error("❌ /generate-image error:", err);
+    res.status(500).json({ error: `Image generation failed: ${err.message}` });
   }
 });
 

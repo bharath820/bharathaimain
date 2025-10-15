@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Mail, Shield, Lock, ArrowRight, Sparkles, CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { BaseUrl } from '../config/config.js';
+import {BaseUrl} from '../config/config.js'
 
 const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -14,7 +14,7 @@ const RegisterPage: React.FC = () => {
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState(1); // 1 = register info, 2 = otp entry
-  const [otpSent, setOtpSent] = useState(false);
+  const [, setOtpSent] = useState(false);
 
   const navigate = useNavigate();
 
@@ -48,7 +48,7 @@ const RegisterPage: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const res = await fetch(`${BaseUrl}/send-otp`, {
+      const res = await fetch(`${BaseUrl}/api/auth/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
@@ -69,46 +69,46 @@ const RegisterPage: React.FC = () => {
       setIsLoading(false);
     }
   };
-const handleVerifyOtp = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsLoading(true);
-  setError("");
-  setSuccess("");
 
-  if (!formData.otp || formData.otp.length !== 6) {
-    setError("Please enter a valid 6-digit OTP");
-    setIsLoading(false);
-    return;
-  }
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+    setSuccess("");
 
-  try {
-    const res = await fetch(`${BaseUrl}/verify-otp`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: formData.email,
-        otp: formData.otp,
-        password: formData.password, // ✅ include password
-      }),
-    });
-
-    const data = await res.json();
-
-    if (res.ok) {
-      setSuccess("🎉 Registration successful! Redirecting to login...");
-      setTimeout(() => {
-        navigate("/login");
-      }, 2000);
-    } else {
-      setError(data.error || "Invalid OTP");
+    // Validation
+    if (!formData.otp || formData.otp.length !== 6) {
+      setError("Please enter a valid 6-digit OTP");
+      return;
     }
-  } catch (error) {
-    console.error("Verify OTP error:", error);
-    setError("Network error. Please check your connection and try again.");
-  } finally {
-    setIsLoading(false);
-  }
-};
+
+    try {
+      const res = await fetch(`${BaseUrl}/api/auth/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          otp: formData.otp,
+        }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setSuccess("🎉 Registration successful! Redirecting to login...");
+        setTimeout(() => {
+          navigate("/");
+        }, 2000);
+      } else {
+        setError(data.message || "Invalid OTP");
+      }
+    } catch (error) {
+      console.error("Verify OTP error:", error);
+      setError("Network error. Please check your connection and try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleResendOtp = async () => {
     setError("");
@@ -116,7 +116,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${BaseUrl}/send-otp`, {
+      const res = await fetch(`${BaseUrl}/api/auth/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
@@ -220,7 +220,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
             </div>
           )}
 
-          <div className="space-y-3">
+            <div className="space-y-3">
             <button
               type="submit"
               disabled={isLoading}
@@ -229,6 +229,16 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
               {isLoading ? "Processing..." : step === 1 ? "Send OTP" : "Verify & Register"}
             </button>
             
+            {step === 1 && (
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">Or</span>
+                </div>
+              </div>
+            )}
             {step === 2 && (
               <button
                 type="button"

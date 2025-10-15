@@ -5,6 +5,9 @@ import { ChatSidebar } from './ChatSidebar';
 import { Message } from '../types/chat';
 import { BaseUrl } from '../config/config.js';
 
+
+
+
 interface Conversation {
   id: string;
   title: string;
@@ -145,13 +148,21 @@ const sendMessage = async (content: string) => {
       setMessages([]);
     }
 
-    // Detect image prompt that starts with /image, image:, generate image
+    // Detect image prompt with various formats
     const cleaned = content.trim();
     const lower = cleaned.toLowerCase();
     const isImagePrompt =
       lower.startsWith("/image") ||
       lower.startsWith("image:") ||
-      lower.startsWith("generate image");
+      lower.startsWith("generate image") ||
+      lower.startsWith("create image") ||
+      lower.startsWith("draw ") ||
+      lower.startsWith("paint ") ||
+      lower.startsWith("make image") ||
+      lower.includes(" generate ") ||
+      lower.includes(" create ") ||
+      lower.includes(" draw ") ||
+      lower.includes(" paint ");
 
     // Add the user message to chat history for UI
     const userMessage = {
@@ -171,6 +182,11 @@ const sendMessage = async (content: string) => {
         .replace(/^\/image\s*/i, "")
         .replace(/^image:\s*/i, "")
         .replace(/^generate image\s*/i, "")
+        .replace(/^create image\s*/i, "")
+        .replace(/^draw\s+/i, "")
+        .replace(/^paint\s+/i, "")
+        .replace(/^make image\s*/i, "")
+        .replace(/\s+(generate|create|draw|paint)\s+/gi, " ")
         .trim();
 
       // Send image prompt to Stability API backend route
@@ -232,10 +248,10 @@ const sendMessage = async (content: string) => {
 };
 
 
-  const handleLogout = () => {
+   const handleLogout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
-    window.location.href = '/register';
+    window.location.href = '/register'; // ✅ React Router handles this internally
   };
 
   return (
@@ -264,24 +280,54 @@ const sendMessage = async (content: string) => {
 
           <div className="flex-1 flex flex-col">
             <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-                  {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-                </button>
-                <h1 className="text-xl font-semibold text-gray-900">Bharat AI</h1>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-green-500 rounded-full flex items-center justify-center text-white font-semibold">
-                    {user?.email?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                  <span>{user?.email || 'User'}</span>
-                </div>
-                <button onClick={handleLogout} className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600" title="Logout">
-                  <LogOut size={18} />
-                </button>
-              </div>
-            </header>
+  <div className="flex items-center gap-3">
+    <button
+      onClick={() => setSidebarOpen(!sidebarOpen)}
+      className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+    >
+      {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+    </button>
+    <h1 className="text-xl font-semibold text-gray-900">Bharat AI</h1>
+  </div>
+
+  <div className="flex items-center gap-3">
+    {user ? (
+      // If user is logged in
+      <>
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-green-500 rounded-full flex items-center justify-center text-white font-semibold">
+            {user.email?.charAt(0).toUpperCase() || 'U'}
+          </div>
+          <span>{user.email}</span>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
+          title="Logout"
+        >
+          <LogOut size={18} />
+        </button>
+      </>
+    ) : (
+      // If no user is logged in
+      <>
+        <button
+          onClick={handleLogin} // Your login function or redirect
+          className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
+        >
+          Login
+        </button>
+        <button
+          onClick={handleSignup} // Your signup function or redirect
+          className="px-4 py-2 text-sm text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition"
+        >
+          Signup
+        </button>
+      </>
+    )}
+  </div>
+</header>
+
 
             <div className="flex-1 overflow-y-auto">
               {messages.length === 0 ? (
@@ -351,7 +397,7 @@ const sendMessage = async (content: string) => {
                     value={currentInput}
                     onChange={(e) => setCurrentInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(currentInput); } }}
-                    placeholder="Ask anything..."
+                    placeholder="Ask anything... (Try 'draw a sunset' or 'generate image of a cat' for images)"
                     disabled={isLoading}
                     className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:opacity-50"
                   />
