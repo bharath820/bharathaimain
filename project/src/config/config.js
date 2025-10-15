@@ -1,1 +1,4 @@
-export const BaseUrl = `https://bharathaimain-1.onrender.com`
+export const BaseUrl =
+  process.env.NODE_ENV === "production"
+    ? "https://bharathaimain-1.onrender.com"
+    : "http://localhost:5000";

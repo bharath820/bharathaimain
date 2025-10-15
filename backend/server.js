@@ -10,18 +10,18 @@ const app = express();
 dotenv.config();
 
 
+app.use(
+  cors({
+    origin: [
+      "https://bharathaimain.vercel.app", // frontend domain
+      "http://localhost:5173",            // for local testing
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+  })
+);
+
 app.use(express.json());
-
-const allowedOrigins = ["https://bharathai.vercel.app", "http://localhost:5173"];
-
-
-
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true,
-}));
-
-
 
 
 // Health check
