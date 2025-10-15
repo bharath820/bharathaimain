@@ -12,7 +12,7 @@ dotenv.config();
 
 app.use(express.json());
 
-const allowedOrigins = [process.env.FRONTEND_ORIGIN || "http://localhost:5173"];
+const allowedOrigins = ["https://bharathai.vercel.app", "http://localhost:5173"];
 
 
 
