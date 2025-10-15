@@ -4,6 +4,8 @@ import { Send, User, Bot, Copy, LogOut, Menu, X } from 'lucide-react';
 import { ChatSidebar } from './ChatSidebar';
 import { Message } from '../types/chat';
 import { BaseUrl } from '../config/config.js';
+import { useNavigate } from 'react-router-dom'; 
+
 
 
 
@@ -29,6 +31,7 @@ export const ChatGPTInterface: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // API configuration - using backend API instead of direct OpenRouter calls
+const navigate = useNavigate();
 
   // Check authentication on mount
   useEffect(() => {
@@ -251,7 +254,7 @@ const sendMessage = async (content: string) => {
    const handleLogout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
-    window.location.href = '/register'; // ✅ React Router handles this internally
+    navigate('/register'); // ✅ React Router handles this internally
   };
 
   return (
