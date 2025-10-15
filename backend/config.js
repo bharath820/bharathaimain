@@ -13,5 +13,7 @@ export const config = {
   GOOGLE_CLIENT_SECRET: "YOUR_GOOGLE_CLIENT_SECRET",
   BaseUrl: "https://bharathaimain-1.onrender.com", // backend
   FrontendUrl: "http://localhost:5173", // frontend
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
 };
 export default config;
