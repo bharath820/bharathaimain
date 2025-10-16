@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { CheckCircle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import {BaseUrl} from '../config/config.js'
+import { BaseUrl } from "../config/config";
 
 const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -13,103 +13,112 @@ const RegisterPage: React.FC = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState(1); // 1 = register info, 2 = otp entry
-  const [, setOtpSent] = useState(false);
+  const [step, setStep] = useState(1); // 1 = registration, 2 = OTP entry
+  // removed unused otpSent state
 
   const navigate = useNavigate();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // ✅ SEND OTP with timeout to avoid hanging UI on slow networks
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
 
-    // Validation
-    if (!formData.email || !formData.email.includes("@")) {
+    const { email, password, confirmPassword } = formData;
+
+    if (!email || !email.includes("@")) {
       setError("Please enter a valid email address");
       return;
     }
 
-    if (!formData.password || formData.password.length < 6) {
+    if (!password || password.length < 6) {
       setError("Password must be at least 6 characters long");
       return;
     }
 
-    if (formData.password !== formData.confirmPassword) {
+    if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
     setIsLoading(true);
+
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
       const res = await fetch(`${BaseUrl}/api/auth/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: formData.email }),
+        body: JSON.stringify({ email }),
+        signal: controller.signal,
       });
+
       const data = await res.json();
+      clearTimeout(timeoutId);
 
       if (res.ok) {
         setSuccess("✅ OTP sent to your email! Please check your inbox.");
-        setOtpSent(true);
         setStep(2);
       } else {
         setError(data.message || "Failed to send OTP");
       }
-    } catch (error) {
-      console.error("Send OTP error:", error);
-      setError("Network error. Please check your connection and try again.");
+    } catch (err: any) {
+      console.error("Send OTP error:", err);
+      if (err?.name === "AbortError") {
+        setError("Request timed out. Please try again.");
+      } else {
+        setError("Network error. Please check your connection and try again.");
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
+  // ✅ VERIFY OTP
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError("");
     setSuccess("");
 
-    // Validation
-    if (!formData.otp || formData.otp.length !== 6) {
+    const { email, password, otp } = formData;
+
+    if (!otp || otp.length !== 6) {
       setError("Please enter a valid 6-digit OTP");
       return;
     }
+
+    setIsLoading(true);
 
     try {
       const res = await fetch(`${BaseUrl}/api/auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          otp: formData.otp,
-        }),
+        body: JSON.stringify({ email, password, otp }),
       });
+
       const data = await res.json();
 
       if (res.ok) {
         setSuccess("🎉 Registration successful! Redirecting to login...");
-        setTimeout(() => {
-          navigate("/");
-        }, 2000);
+        setTimeout(() => navigate("/login"), 2000);
       } else {
-        setError(data.message || "Invalid OTP");
+        setError(data.error || data.message || "Invalid OTP");
       }
-    } catch (error) {
-      console.error("Verify OTP error:", error);
+    } catch (err) {
+      console.error("Verify OTP error:", err);
       setError("Network error. Please check your connection and try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
+  // ✅ RESEND OTP
   const handleResendOtp = async () => {
     setError("");
     setSuccess("");
@@ -121,6 +130,7 @@ const RegisterPage: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
       });
+
       const data = await res.json();
 
       if (res.ok) {
@@ -128,8 +138,8 @@ const RegisterPage: React.FC = () => {
       } else {
         setError(data.message || "Failed to resend OTP");
       }
-    } catch (error) {
-      console.error("Resend OTP error:", error);
+    } catch (err) {
+      console.error("Resend OTP error:", err);
       setError("Network error. Please try again.");
     } finally {
       setIsLoading(false);
@@ -143,13 +153,17 @@ const RegisterPage: React.FC = () => {
           {step === 1 ? "Create Account" : "Verify OTP"}
         </h2>
 
-        <form onSubmit={step === 1 ? handleSendOtp : handleVerifyOtp} className="space-y-6">
+        <form
+          onSubmit={step === 1 ? handleSendOtp : handleVerifyOtp}
+          className="space-y-6"
+        >
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-2">
               <XCircle className="w-5 h-5" />
               {error}
             </div>
           )}
+
           {success && (
             <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl flex items-center gap-2">
               <CheckCircle className="w-5 h-5" />
@@ -160,7 +174,9 @@ const RegisterPage: React.FC = () => {
           {step === 1 ? (
             <>
               <div>
-                <label className="block text-gray-800 font-semibold mb-2">Email</label>
+                <label className="block text-gray-800 font-semibold mb-2">
+                  Email
+                </label>
                 <input
                   type="email"
                   name="email"
@@ -170,8 +186,11 @@ const RegisterPage: React.FC = () => {
                   className="w-full border rounded-xl p-3"
                 />
               </div>
+
               <div>
-                <label className="block text-gray-800 font-semibold mb-2">Password</label>
+                <label className="block text-gray-800 font-semibold mb-2">
+                  Password
+                </label>
                 <input
                   type="password"
                   name="password"
@@ -181,8 +200,11 @@ const RegisterPage: React.FC = () => {
                   className="w-full border rounded-xl p-3"
                 />
               </div>
+
               <div>
-                <label className="block text-gray-800 font-semibold mb-2">Confirm Password</label>
+                <label className="block text-gray-800 font-semibold mb-2">
+                  Confirm Password
+                </label>
                 <input
                   type="password"
                   name="confirmPassword"
@@ -194,19 +216,24 @@ const RegisterPage: React.FC = () => {
               </div>
             </>
           ) : (
-            <div>
-              <label className="block text-gray-800 font-semibold mb-2">Enter OTP</label>
-              <input
-                type="text"
-                name="otp"
-                value={formData.otp}
-                onChange={handleInputChange}
-                required
-                className="w-full border rounded-xl p-3 tracking-widest text-center text-lg"
-                maxLength={6}
-                placeholder="000000"
-                pattern="[0-9]{6}"
-              />
+            <>
+              <div>
+                <label className="block text-gray-800 font-semibold mb-2">
+                  Enter OTP
+                </label>
+                <input
+                  type="text"
+                  name="otp"
+                  value={formData.otp}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full border rounded-xl p-3 tracking-widest text-center text-lg"
+                  maxLength={6}
+                  placeholder="000000"
+                  pattern="[0-9]{6}"
+                />
+              </div>
+
               <div className="mt-3 text-center">
                 <button
                   type="button"
@@ -217,28 +244,22 @@ const RegisterPage: React.FC = () => {
                   {isLoading ? "Sending..." : "Resend OTP"}
                 </button>
               </div>
-            </div>
+            </>
           )}
 
-            <div className="space-y-3">
+          <div className="space-y-3">
             <button
               type="submit"
               disabled={isLoading}
               className="w-full bg-gradient-to-r from-orange-600 via-blue-600 to-green-600 text-white py-3 rounded-xl hover:scale-105 transition-all font-semibold disabled:opacity-50"
             >
-              {isLoading ? "Processing..." : step === 1 ? "Send OTP" : "Verify & Register"}
+              {isLoading
+                ? "Processing..."
+                : step === 1
+                ? "Send OTP"
+                : "Verify & Register"}
             </button>
-            
-            {step === 1 && (
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or</span>
-                </div>
-              </div>
-            )}
+
             {step === 2 && (
               <button
                 type="button"
@@ -249,13 +270,13 @@ const RegisterPage: React.FC = () => {
                 ← Back to Registration
               </button>
             )}
-            
+
             <div className="text-center pt-4 border-t border-gray-200">
               <p className="text-gray-600 text-sm">
                 Already have an account?{" "}
                 <button
                   type="button"
-                  onClick={() => navigate('/login')}
+                  onClick={() => navigate("/login")}
                   className="text-blue-600 hover:text-blue-800 font-semibold underline"
                 >
                   Login here

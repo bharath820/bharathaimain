@@ -15,6 +15,7 @@ app.use(
     origin: [
       "https://bharathaimain.vercel.app", // frontend domain
       "http://localhost:5173",            // for local testing
+      "http://127.0.0.1:5173",           // alternate localhost
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
