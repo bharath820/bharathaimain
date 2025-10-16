@@ -196,11 +196,22 @@ const handleGoogleLogin = async (credentialResponse: any) => {
               )}
             </button>
 
-            {/* Google Login */}
-           <GoogleLogin
+         {/* Google Login Section */}
+<div className="flex flex-col items-center gap-4 mt-4">
+  <div className="w-full flex justify-center">
+    <div className="w-full sm:w-[280px]">
+      <GoogleLogin
         onSuccess={handleGoogleLogin}
         onError={() => setError("Google login failed")}
+        useOneTap
+        theme="outline"
+        size="large"
+        shape="rectangular"
+        width="100%"
       />
+    </div>
+  </div>
+</div>
 
             {/* Register Button */}
             <button
