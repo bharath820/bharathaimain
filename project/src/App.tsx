@@ -11,7 +11,7 @@ const App: React.FC = () => {
       <Route path="/" element={<AuthPage />} />
       <Route path="/login" element={<AuthPage />} />
       <Route path="/register" element={<RegisterPage />} />
-      <Route path="/chat" element={<ChatContainer />} />
+      {/* <Route path="/chat" element={<ChatContainer />} /> */}
       <Route path="/chatgpt" element={<ChatGPTInterface />} />
     </Routes>
   );
