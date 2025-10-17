@@ -18,8 +18,9 @@ if (!config.EMAIL_USER || !config.EMAIL_PASS) {
 // ✅ Gmail transporter for sending OTP emails
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 587,
-  secure: false, // use TLS
+  service: "Gmail",
+  port: 465,
+  secure: true, // use TLS
   requireTLS: true,
   auth: {
     user: config.EMAIL_USER,
