@@ -9,15 +9,20 @@ const app = express();
 
 dotenv.config();
 
+const allowedOrigins = [
+  "https://bharathaimain.vercel.app",
+  "http://localhost:5173", // for local dev
+];
 
 app.use(
   cors({
-    origin: [
-      "https://bharathaimain.vercel.app", // frontend domain
-      "http://localhost:5173",            // for local testing
-      "http://127.0.0.1:5173",           // alternate localhost
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
