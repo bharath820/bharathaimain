@@ -17,11 +17,16 @@ if (!config.EMAIL_USER || !config.EMAIL_PASS) {
 
 // ✅ Gmail transporter for sending OTP emails
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false, // use TLS
+  requireTLS: true,
   auth: {
     user: config.EMAIL_USER,
     pass: config.EMAIL_PASS,
   },
+   connectionTimeout: 10000, // 10 seconds
+  greetingTimeout: 10000
 });
 
 // ✅ Helper to generate 6-digit OTP
