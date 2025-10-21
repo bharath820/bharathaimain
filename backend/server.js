@@ -10,7 +10,7 @@ const app = express();
 dotenv.config();
 
 const allowedOrigins = [
-  "https://bharathaimain.vercel.app",
+  "https://bharathaimain-1.onrender.com",
   "http://localhost:5173", // for local dev
 ];
 
