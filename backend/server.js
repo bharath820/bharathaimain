@@ -14,18 +14,26 @@ const allowedOrigins = [
   "http://localhost:5173", // for local dev
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: function(origin, callback){
+    // allow requests with no origin (Postman, mobile apps)
+    if(!origin) return callback(null, true);
+    if(allowedOrigins.indexOf(origin) === -1){
+      return callback(new Error("CORS not allowed"), false);
+    }
+    return callback(null, true);
+  },
+  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+  credentials: true, // if sending cookies
+}));
+
+
+app.use((req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+  next();
+});
+
 
 app.use(express.json());
 
