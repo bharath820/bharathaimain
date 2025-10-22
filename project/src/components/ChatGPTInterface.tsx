@@ -1,14 +1,9 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, User, Bot, Copy, LogOut, Menu, X } from 'lucide-react';
 import { ChatSidebar } from './ChatSidebar';
 import { Message } from '../types/chat';
 import { BaseUrl } from '../config/config.js';
-import { useNavigate } from 'react-router-dom'; 
-
-
-
-
+import { useNavigate } from 'react-router-dom';
 
 interface Conversation {
   id: string;
@@ -26,33 +21,31 @@ export const ChatGPTInterface: React.FC = () => {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // API configuration - using backend API instead of direct OpenRouter calls
-const navigate = useNavigate();
-
-  // Check authentication on mount
+  // ✅ Check authentication
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     const userData = localStorage.getItem('user');
-    
+
     if (token && userData) {
-      setIsAuthenticated(true);
       setUser(JSON.parse(userData));
       setIsCheckingAuth(false);
       loadConversations();
     } else {
-      setTimeout(() => window.location.href = '/login', 100);
+      setTimeout(() => navigate('/login'), 100);
     }
   }, []);
 
+  // ✅ Load messages when a conversation is selected
   useEffect(() => {
     if (currentConversationId) loadMessages(currentConversationId);
     else setMessages([]);
   }, [currentConversationId]);
 
+  // ✅ Auto-scroll chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
@@ -62,82 +55,69 @@ const navigate = useNavigate();
       const token = localStorage.getItem('authToken');
       if (!token) return;
 
-      const response = await fetch(`${BaseUrl}/api/conversations`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(`${BaseUrl}/api/conversations`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        const mappedConversations = data.conversations.map((conv: any) => ({
-          id: conv._id,
-          title: conv.title,
-          createdAt: conv.createdAt,
-          updatedAt: conv.updatedAt
+      if (res.ok) {
+        const data = await res.json();
+        const mapped = data.conversations.map((c: any) => ({
+          id: c._id,
+          title: c.title,
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
         }));
-        setConversations(mappedConversations);
-
-        if (mappedConversations.length > 0 && !currentConversationId) {
-          setCurrentConversationId(mappedConversations[0].id);
-        }
-      } else {
-        setConversations([]);
+        setConversations(mapped);
+        if (!currentConversationId && mapped.length) setCurrentConversationId(mapped[0].id);
       }
     } catch (err) {
-      console.error(err);
-      setConversations([]);
+      console.error('Load conversations error:', err);
     }
   };
 
   const loadMessages = async (conversationId: string) => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${BaseUrl}/api/conversations/${conversationId}/messages`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(`${BaseUrl}/api/conversations/${conversationId}/messages`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        const mappedMessages = data.messages.map((msg: any) => ({
-          id: msg._id,
-          content: msg.content,
-          role: msg.role,
-          timestamp: new Date(msg.timestamp),
-          imageUrl: msg.imageUrl,
-          isImage: msg.isImage
+      if (res.ok) {
+        const data = await res.json();
+        const mapped = data.messages.map((m: any) => ({
+          id: m._id,
+          content: m.content,
+          role: m.role,
+          timestamp: new Date(m.timestamp),
+          imageUrl: m.imageUrl,
+          isImage: m.isImage,
         }));
-        setMessages(mappedMessages);
-      } else {
-        setMessages([]);
+        setMessages(mapped);
       }
     } catch (err) {
-      console.error(err);
-      setMessages([]);
+      console.error('Load messages error:', err);
     }
   };
 
   const createNewConversationAndReturnId = async (): Promise<string | null> => {
     try {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`${BaseUrl}/api/conversations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ title: "New Chat" }),
+      const token = localStorage.getItem('authToken');
+      const res = await fetch(`${BaseUrl}/api/conversations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: 'New Chat' }),
       });
-
-      if (response.ok) {
-        const data = await response.json();
+      if (res.ok) {
+        const data = await res.json();
         loadConversations();
         return data.conversation._id;
       }
-      return null;
     } catch (err) {
       console.error(err);
-      return null;
     }
+    return null;
   };
 
-  // **Core: send message via backend API to OpenRouter**
-const sendMessage = async (content: string) => {
+  // ✅ Send message (text or image)
+  const sendMessage = async (content: string) => {
   if (!content.trim()) return;
   setIsLoading(true);
   setError(null);
@@ -146,115 +126,94 @@ const sendMessage = async (content: string) => {
     let convId = currentConversationId;
     if (!convId) {
       convId = await createNewConversationAndReturnId();
-      if (!convId) throw new Error("Failed to create conversation");
+      if (!convId) throw new Error('Failed to create conversation');
       setCurrentConversationId(convId);
       setMessages([]);
     }
 
-    // Detect image prompt with various formats
     const cleaned = content.trim();
-    const lower = cleaned.toLowerCase();
-    const isImagePrompt =
-      lower.startsWith("/image") ||
-      lower.startsWith("image:") ||
-      lower.startsWith("generate image") ||
-      lower.startsWith("create image") ||
-      lower.startsWith("draw ") ||
-      lower.startsWith("paint ") ||
-      lower.startsWith("make image") ||
-      lower.includes(" generate ") ||
-      lower.includes(" create ") ||
-      lower.includes(" draw ") ||
-      lower.includes(" paint ");
 
-    // Add the user message to chat history for UI
+    // Detect image prompt
+    const isImagePrompt =
+      cleaned.toLowerCase().startsWith('/image') ||
+      cleaned.toLowerCase().includes('generate image') ||
+      cleaned.toLowerCase().includes('draw') ||
+      cleaned.toLowerCase().includes('create image');
+
+    const token = localStorage.getItem('authToken');
+
+    // Optimistically add user's message
     const userMessage = {
       id: Date.now().toString(),
       content: cleaned,
-      role: "user",
+      role: 'user',
       timestamp: new Date(),
+      isImage: false,
     };
     setMessages(prev => [...prev, userMessage]);
-    setCurrentInput("");
-
-    const token = localStorage.getItem("authToken");
+    setCurrentInput('');
 
     if (isImagePrompt) {
-      // Remove the prompt prefix before sending to backend
+      // Clean prompt for image API
       const promptText = cleaned
-        .replace(/^\/image\s*/i, "")
-        .replace(/^image:\s*/i, "")
-        .replace(/^generate image\s*/i, "")
-        .replace(/^create image\s*/i, "")
-        .replace(/^draw\s+/i, "")
-        .replace(/^paint\s+/i, "")
-        .replace(/^make image\s*/i, "")
-        .replace(/\s+(generate|create|draw|paint)\s+/gi, " ")
+        .replace(/^\/image\s*/i, '')
+        .replace(/^generate image\s*/i, '')
+        .replace(/^draw\s+/i, '')
+        .replace(/^create image\s*/i, '')
         .trim();
 
-      // Send image prompt to Stability API backend route
-      const response = await fetch(`${BaseUrl}/api/generate-image`, {
-        method: "POST",
+      const res = await fetch(`${BaseUrl}/api/generate-image`, {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ prompt: promptText, conversationId: convId }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Image generation failed");
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Image generation failed');
       }
 
-      // Reload messages from backend (because assistant image message is inserted by backend)
-      setTimeout(() => loadMessages(convId), 300);
-      return;
+      const data = await res.json();
+      setMessages(prev => [...prev, data.message]);
     } else {
-      // All other prompts (text) handled by OpenRouter
-      const chatMessages = [...messages, userMessage].map(m => ({
+      // Text generation
+      const chatHistory = [...messages, userMessage].map(m => ({
         role: m.role,
         content: m.content,
       }));
-      const response = await fetch(`${BaseUrl}/api/search`, {
-        method: "POST",
+
+      const res = await fetch(`${BaseUrl}/api/generate-text`, {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ messages: chatMessages, conversationId: convId }),
+        body: JSON.stringify({ messages: chatHistory, conversationId: convId }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Text generation failed");
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Text generation failed');
       }
 
-      const data = await response.json();
-      setMessages(prev => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          content: data.result,
-          role: "assistant",
-          timestamp: new Date(),
-        },
-      ]);
-      setTimeout(() => loadMessages(convId), 300);
+      const data = await res.json();
+      setMessages(prev => [...prev, data.message]);
     }
   } catch (err) {
-    console.error(err);
-    setError(err instanceof Error ? err.message : "Unexpected error");
+    setError(err instanceof Error ? err.message : 'Unexpected error');
   } finally {
     setIsLoading(false);
   }
 };
 
 
-   const handleLogout = () => {
+  const handleLogout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
-    navigate('/register'); // ✅ React Router handles this internally
+    navigate('/register');
   };
 
   return (
@@ -269,111 +228,115 @@ const sendMessage = async (content: string) => {
         </div>
       ) : (
         <>
+          {/* Sidebar */}
           <div className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 overflow-hidden`}>
             <ChatSidebar
               conversations={conversations}
               currentConversationId={currentConversationId}
               onNewChat={createNewConversationAndReturnId}
               onSelectConversation={setCurrentConversationId}
-              onDeleteConversation={async (id) => { /* implement if needed */ }}
-              onRenameConversation={async (id, title) => { /* implement if needed */ }}
               isLoading={isLoading}
             />
           </div>
 
+          {/* Chat Area */}
           <div className="flex-1 flex flex-col">
+            {/* Header */}
             <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-  <div className="flex items-center gap-3">
-    <button
-      onClick={() => setSidebarOpen(!sidebarOpen)}
-      className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-    >
-      {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-    </button>
-    <h1 className="text-xl font-semibold text-gray-900">Bharat AI</h1>
-  </div>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                  {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+                </button>
+                <h1 className="text-xl font-semibold text-gray-900">Bharat AI</h1>
+              </div>
 
-  <div className="flex items-center gap-3">
-    {user ? (
-      // If user is logged in
-      <>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-green-500 rounded-full flex items-center justify-center text-white font-semibold">
-            {user.email?.charAt(0).toUpperCase() || 'U'}
-          </div>
-          <span>{user.email}</span>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
-          title="Logout"
-        >
-          <LogOut size={18} />
-        </button>
-      </>
-    ) : (
-      // If no user is logged in
-      <>
-        <button
-          onClick={handleLogin} // Your login function or redirect
-          className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
-        >
-          Login
-        </button>
-        <button
-          onClick={handleSignup} // Your signup function or redirect
-          className="px-4 py-2 text-sm text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition"
-        >
-          Signup
-        </button>
-      </>
-    )}
-  </div>
-</header>
+              <div className="flex items-center gap-3">
+                {user && (
+                  <>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-green-500 rounded-full flex items-center justify-center text-white font-semibold">
+                        {user.email?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                      <span>{user.email}</span>
+                    </div>
+                    <button onClick={handleLogout} className="p-2 rounded-lg hover:bg-gray-100 text-gray-600">
+                      <LogOut size={18} />
+                    </button>
+                  </>
+                )}
+              </div>
+            </header>
 
-
+            {/* Messages */}
             <div className="flex-1 overflow-y-auto">
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
-                    <h2 className="text-2xl font-semibold text-gray-900 mb-2">Welcome back, {user?.email?.split('@')[0] || 'User'}!</h2>
+                    <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                      Welcome back, {user?.email?.split('@')[0] || 'User'}!
+                    </h2>
                     <p className="text-gray-600 mb-4">Start your first conversation with Bharat AI</p>
-                    <button onClick={() => sendMessage("Hello")} className="bg-gradient-to-r from-orange-500 to-green-500 text-white px-6 py-2 rounded-lg hover:from-orange-600 hover:to-green-600 transition-colors">
+                    <button
+                      onClick={() => sendMessage('Hello')}
+                      className="bg-gradient-to-r from-orange-500 to-green-500 text-white px-6 py-2 rounded-lg hover:from-orange-600 hover:to-green-600 transition-colors"
+                    >
                       Start Chat
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="max-w-4xl mx-auto">
-                  {messages.map((message) => (
-                    <div key={message.id} className={`flex gap-3 p-6 ${message.role === 'user' ? 'bg-white' : 'bg-gray-50'} border-b border-gray-100`}>
-                      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-600 text-white'}`}>
-                        {message.role === 'user' ? <User size={16} /> : <Bot size={16} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="text-sm font-semibold text-gray-900 mb-2">{message.role === 'user' ? 'You' : 'Bharat AI'}</div>
-                          <button onClick={() => navigator.clipboard.writeText(message.content)} className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors" title="Copy message">
-                            <Copy size={14} />
-                          </button>
-                        </div>
-                        <div className="prose prose-sm max-w-none text-gray-800 whitespace-pre-wrap">{message.content}</div>
-                        {message.isImage && message.imageUrl && (
-                          <div className="mt-3">
-                            <img 
-                              src={message.imageUrl} 
-                              alt="Generated image" 
-                              className="max-w-full h-auto rounded-lg shadow-sm border border-gray-200"
-                              style={{ maxHeight: '400px' }}
-                            />
-                          </div>
-                        )}
-                        <div className="text-xs text-gray-400 mt-2">{message.timestamp.toLocaleTimeString()}</div>
-                      </div>
-                    </div>
-                  ))}
+                  {messages.map((m) => (
+  <div
+    key={m.id}
+    className={`flex gap-3 p-6 ${
+      m.role === "user" ? "bg-white" : "bg-gray-50"
+    } border-b`}
+  >
+    <div
+      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+        m.role === "user" ? "bg-blue-500" : "bg-gray-600"
+      } text-white`}
+    >
+      {m.role === "user" ? <User size={16} /> : <Bot size={16} />}
+    </div>
+    <div className="flex-1 min-w-0">
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-sm font-semibold text-gray-900 mb-2">
+          {m.role === "user" ? "You" : "Bharat AI"}
+        </div>
+        <button
+          onClick={() => navigator.clipboard.writeText(m.content)}
+          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+          title="Copy"
+        >
+          <Copy size={14} />
+        </button>
+      </div>
+
+      <div className="prose prose-sm text-gray-800 whitespace-pre-wrap">
+        {m.content}
+      </div>
+
+      {m.isImage && m.imageUrl && (
+        <div className="mt-3 w-full">
+          <img
+            src={`${BaseUrl}/api/image-proxy?url=${encodeURIComponent(m.imageUrl)}`}
+            alt="Generated"
+            className="w-full h-auto rounded-lg shadow-lg border border-gray-300"
+          />
+        </div>
+      )}
+
+      <div className="text-xs text-gray-400 mt-2">
+        {new Date(m.timestamp).toLocaleTimeString()}
+      </div>
+    </div>
+  </div>
+))}
+
                   {isLoading && (
-                    <div className="flex gap-3 p-6 bg-gray-50 border-b border-gray-100">
+                    <div className="flex gap-3 p-6 bg-gray-50 border-b">
                       <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-600 text-white flex items-center justify-center">
                         <Bot size={16} />
                       </div>
@@ -392,6 +355,7 @@ const sendMessage = async (content: string) => {
               )}
             </div>
 
+            {/* Input */}
             <div className="border-t border-gray-200 p-4">
               <div className="max-w-4xl mx-auto">
                 <div className="flex gap-3">
@@ -399,15 +363,20 @@ const sendMessage = async (content: string) => {
                     type="text"
                     value={currentInput}
                     onChange={(e) => setCurrentInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(currentInput); } }}
-                    placeholder="Ask anything... (Try 'draw a sunset' or 'generate image of a cat' for images)"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage(currentInput);
+                      }
+                    }}
+                    placeholder="Ask anything... (Try 'draw a cat' or 'generate image of mountains')"
                     disabled={isLoading}
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:opacity-50"
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                   />
                   <button
                     onClick={() => sendMessage(currentInput)}
                     disabled={isLoading || !currentInput.trim()}
-                    className="px-4 py-3 bg-gradient-to-r from-orange-500 to-green-500 text-white rounded-lg hover:from-orange-600 hover:to-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-4 py-3 bg-gradient-to-r from-orange-500 to-green-500 text-white rounded-lg hover:from-orange-600 hover:to-green-600 transition"
                   >
                     <Send size={20} />
                   </button>

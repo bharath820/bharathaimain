@@ -1,14 +1,14 @@
-
 import express from "express";
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import jwt from "jsonwebtoken";
 import { config } from "../config.js";
 import OpenAI from "openai";
-import fetch from 'node-fetch';
+import fetch from "node-fetch";
+
 const router = express.Router();
 
-// 🔐 JWT Auth Middleware
+// 🔐 JWT Authentication Middleware
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
@@ -21,185 +21,189 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// 🧠 Initialize OpenAI Client
 const openai = new OpenAI({
-  apiKey: config.OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: config.OPENAI_API_KEY,
 });
 
-// 📋 GET all conversations
+// ============================
+// 📋 GET ALL CONVERSATIONS
+// ============================
 router.get("/conversations", authenticateToken, async (req, res) => {
   try {
-    const conversations = await Conversation.find({ user: req.user.id }).sort({
-      updatedAt: -1,
-    });
+    const conversations = await Conversation.find({ user: req.user.id }).sort({ updatedAt: -1 });
     res.json({ conversations });
   } catch (err) {
-    console.error("Get conversations error:", err);
+    console.error("❌ Get conversations error:", err);
     res.status(500).json({ error: "Failed to get conversations" });
   }
 });
 
-// ➕ CREATE new conversation
+// ============================
+// ➕ CREATE NEW CONVERSATION
+// ============================
 router.post("/conversations", authenticateToken, async (req, res) => {
   try {
     const { title } = req.body;
-    const conv = await Conversation.create({
+    const conversation = await Conversation.create({
       user: req.user.id,
       title: title || "New Chat",
     });
-    res.json({ conversation: conv });
+    res.json({ conversation });
   } catch (err) {
-    console.error("Create conversation error:", err);
+    console.error("❌ Create conversation error:", err);
     res.status(500).json({ error: "Failed to create conversation" });
   }
 });
 
-// 💬 GET messages for a conversation
+// ============================
+// 💬 GET MESSAGES
+// ============================
 router.get("/conversations/:id/messages", authenticateToken, async (req, res) => {
   try {
-    const messages = await Message.find({ conversation: req.params.id }).sort({
-      timestamp: 1,
-    });
+    const messages = await Message.find({ conversation: req.params.id }).sort({ timestamp: 1 });
     res.json({ messages });
   } catch (err) {
-    console.error("Get messages error:", err);
+    console.error("❌ Get messages error:", err);
     res.status(500).json({ error: "Failed to get messages" });
   }
 });
 
-// 🧠 POST message & get AI response via OpenRouter
-router.post("/search", authenticateToken, async (req, res) => {
+// ============================
+// 🤖 TEXT GENERATION
+// ============================
+router.post("/generate-text", authenticateToken, async (req, res) => {
   try {
     const { messages, conversationId } = req.body;
+    if (!messages?.length) return res.status(400).json({ error: "Messages are required" });
 
-    if (!messages?.length) return res.status(400).json({ error: "Messages required" });
+    let conversation = await Conversation.findOne({ _id: conversationId, user: req.user.id });
+    if (!conversation) {
+      conversation = await Conversation.create({ user: req.user.id, title: "New Chat" });
+    }
 
-    // find/create conversation
-    let conv = await Conversation.findOne({ _id: conversationId, user: req.user.id });
-    if (!conv) conv = await Conversation.create({ user: req.user.id, title: "New Chat" });
-
-    // save user message
     const userMsg = messages[messages.length - 1];
     await Message.create({
-      conversation: conv._id,
+      conversation: conversation._id,
       role: "user",
       content: userMsg.content,
       timestamp: new Date(),
     });
 
-    // send to OpenRouter
     const completion = await openai.chat.completions.create({
-      model: "openai/gpt-4o-mini",
+      model: "gpt-4o",
       messages,
       max_tokens: 1000,
       temperature: 0.7,
     });
 
-    const aiText = completion.choices?.[0]?.message?.content || "⚠️ No response";
-
-    // save assistant message
+    const aiText = completion.choices?.[0]?.message?.content?.trim() || "⚠️ No response";
     await Message.create({
-      conversation: conv._id,
+      conversation: conversation._id,
       role: "assistant",
       content: aiText,
       timestamp: new Date(),
     });
 
-    res.json({ result: aiText, conversationId: conv._id });
+    conversation.updatedAt = new Date();
+    await conversation.save();
+
+    res.json({
+      result: aiText,
+      message: {
+        id: "assistant_" + Date.now(),
+        content: aiText,
+        role: "assistant",
+        timestamp: new Date(),
+        isImage: false,
+      },
+      conversationId: conversation._id,
+    });
   } catch (err) {
-    console.error("🔥 /search error:", err);
-    res.status(500).json({ error: err.message || "OpenRouter text generation failed" });
+    res.status(500).json({ error: err.message || "Text generation failed" });
   }
 });
 
-
-
+// ============================
+// 🎨 IMAGE GENERATION
+// ============================
 router.post("/generate-image", authenticateToken, async (req, res) => {
   try {
     const { prompt, conversationId } = req.body;
     if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-    // Check if Stability AI key is configured
-    if (!config.STABILITY_API_KEY) {
-      return res.status(500).json({ error: "Stability AI API key not configured" });
+    let conversation = await Conversation.findOne({ _id: conversationId, user: req.user.id });
+    if (!conversation) {
+      conversation = await Conversation.create({ user: req.user.id, title: "Image Chat" });
     }
 
-    // find or create conversation
-    let conv = await Conversation.findOne({ _id: conversationId, user: req.user.id });
-    if (!conv) conv = await Conversation.create({ user: req.user.id, title: "Image Chat" });
-
-    // save user message
+    // Save user prompt
     await Message.create({
-      conversation: conv._id,
+      conversation: conversation._id,
       role: "user",
       content: prompt,
       timestamp: new Date(),
     });
 
-    console.log("🎨 Generating image with prompt:", prompt);
+    // Generate image using DALL·E 3
+    const imageResponse = await openai.images.generate({
+      model: "dall-e-3",
+      prompt,
+      size: "1024x1024",
+    });
 
-    // Call Stability AI API directly
-    const stabilityResponse = await fetch(
-      'https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.STABILITY_API_KEY}`,
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          text_prompts: [
-            {
-              text: prompt,
-              weight: 1
-            }
-          ],
-          cfg_scale: 7,
-          height: 1024,
-          width: 1024,
-          samples: 1,
-          steps: 30,
-        }),
-      }
-    );
+    const imageUrl = imageResponse.data?.[0]?.url || null;
+    if (!imageUrl) throw new Error("No image generated");
 
-    if (!stabilityResponse.ok) {
-      const errorData = await stabilityResponse.json().catch(() => ({}));
-      console.error("❌ Stability AI API error:", errorData);
-      throw new Error(`Stability AI API error: ${stabilityResponse.status} ${stabilityResponse.statusText}`);
-    }
-
-    const stabilityData = await stabilityResponse.json();
-    console.log("✅ Stability AI response received");
-
-    if (!stabilityData.artifacts || stabilityData.artifacts.length === 0) {
-      throw new Error("No image generated by Stability AI");
-    }
-
-    // Convert base64 image to data URL
-    const imageBase64 = stabilityData.artifacts[0].base64;
-    const imageUrl = `data:image/png;base64,${imageBase64}`;
-
-    // save assistant image message
-    await Message.create({
-      conversation: conv._id,
+    const aiMessage = await Message.create({
+      conversation: conversation._id,
       role: "assistant",
-      content: `Here's the image you requested:`,
+      content: "Here's your generated image:",
       imageUrl,
       isImage: true,
       timestamp: new Date(),
     });
 
-    console.log("✅ Image generation completed successfully");
-    res.json({ imageUrl, conversationId: conv._id });
+    conversation.updatedAt = new Date();
+    await conversation.save();
+
+    res.json({
+      message: {
+        id: aiMessage._id,
+        content: aiMessage.content,
+        role: aiMessage.role,
+        timestamp: aiMessage.timestamp,
+        imageUrl,
+        isImage: true,
+      },
+      conversationId: conversation._id,
+    });
   } catch (err) {
-    console.error("❌ /generate-image error:", err);
+    console.error("❌ Image generation error:", err);
     res.status(500).json({ error: `Image generation failed: ${err.message}` });
   }
 });
 
+// ============================
+// 🧩 IMAGE PROXY (CORS FIX)
+// ============================
+router.get("/image-proxy", async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url) return res.status(400).send("URL is required");
 
+    const response = await fetch(url);
+    if (!response.ok) {
+      return res.status(response.status).send("Failed to fetch image");
+    }
+
+    res.set("Content-Type", response.headers.get("content-type") || "image/png");
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error("Image proxy error:", err);
+    res.status(500).send("Failed to load image");
+  }
+});
 
 export default router;
-
