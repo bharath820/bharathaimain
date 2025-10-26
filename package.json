@@ -1,0 +1,28 @@
+{
+  "name": "bharat-ai-otp-system",
+  "version": "1.0.0",
+  "description": "Complete OTP-based user registration system",
+  "scripts": {
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd project && npm run dev",
+    "start:dev": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "install:all": "cd backend && npm install && cd ../project && npm install",
+    "test:backend": "cd backend && node test-otp.js"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "otp",
+    "registration",
+    "react",
+    "nodejs",
+    "mongodb"
+  ],
+  "author": "Bharat AI",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  }
+}
