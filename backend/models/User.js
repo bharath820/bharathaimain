@@ -1,11 +1,12 @@
+// models/User.js
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema({
-  email: { type: String, unique: true, required: true },
-  name: { type: String, default: "" },
-  avatar: { type: String, default: "" },
-  password: { type: String, default: "" }, // empty for Google sign-ins
-  googleId: { type: String, default: "" },
+  email: { type: String, required: true, unique: true },
+  password: { type: String }, // Optional for Google users
+  name: { type: String },
+  picture: { type: String },
+  authProvider: { type: String, default: 'email' }, // 'email' or 'google'
 }, { timestamps: true });
 
 export default mongoose.model("User", userSchema);

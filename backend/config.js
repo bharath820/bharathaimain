@@ -9,6 +9,7 @@ export const config = {
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
   STABILITY_API_KEY: process.env.STABILITY_API_KEY,
   REPLICATE_API_TOKEN: process.env.REPLICATE_API_TOKEN,
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   GOOGLE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID",
   GOOGLE_CLIENT_SECRET: "YOUR_GOOGLE_CLIENT_SECRET",
   BaseUrl: "https://bharathaimain-1.onrender.com", // backend

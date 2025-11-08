@@ -3,9 +3,9 @@ import { Mail, Shield, ArrowRight, Sparkles, Zap } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ChatGPTInterface } from "./ChatGPTInterface";
 import { BaseUrl } from "../config/config.js";
-import { GoogleLogin } from '@react-oauth/google';
+import { GoogleLogin } from "@react-oauth/google";
 
-export const AuthPage: React.FC = () => {
+export const AuthPage = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -16,17 +16,17 @@ export const AuthPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ Google API Initialization
+  // ✅ Handle token from redirect (if your backend redirects with token)
   useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get("token");
-  if (token) {
-    localStorage.setItem("authToken", token);
-    navigate("/chatgpt");
-  } 
-}, [navigate]);
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    if (token) {
+      localStorage.setItem("authToken", token);
+      navigate("/chatgpt");
+    }
+  }, [navigate]);
 
-  // ✅ Redirect to /register if not authenticated and at "/"
+  // ✅ Redirect if already logged in
   useEffect(() => {
     const token = localStorage.getItem("authToken");
     if (token) {
@@ -36,12 +36,12 @@ export const AuthPage: React.FC = () => {
     }
   }, [navigate, location.pathname]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   // ✅ Email/Password Login
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
@@ -73,9 +73,8 @@ export const AuthPage: React.FC = () => {
     }
   };
 
-  // ✅ Redirect to Google OAuth (handled by backend)
-  
-const handleGoogleLogin = async (credentialResponse: any) => {
+  // ✅ Google Login Handler
+  const handleGoogleLogin = async (credentialResponse) => {
     setError("");
     try {
       const res = await fetch(`${BaseUrl}/api/auth/google`, {
@@ -86,25 +85,20 @@ const handleGoogleLogin = async (credentialResponse: any) => {
 
       const data = await res.json();
       if (res.ok) {
-        // store your backend-issued JWT
         localStorage.setItem("authToken", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
-        window.location.href = "/chatgpt"; // or use react-router navigate
+        navigate("/chatgpt");
       } else {
-        setError(data.message || "Login failed");
+        setError(data.message || "Google sign-in failed");
       }
     } catch (err) {
       console.error(err);
-      setError("Network error");
+      setError("Network error during Google sign-in");
     }
   };
 
-
-
-  // ✅ Navigate to Register page
   const handleRegister = () => navigate("/register");
 
-  // ✅ Show ChatGPT Interface if logged in
   if (isAuthenticated) return <ChatGPTInterface />;
 
   return (
@@ -196,22 +190,17 @@ const handleGoogleLogin = async (credentialResponse: any) => {
               )}
             </button>
 
-         {/* Google Login Section */}
-<div className="flex flex-col items-center gap-4 mt-4">
-  <div className="w-full flex justify-center">
-    <div className="w-full sm:w-[280px]">
-      <GoogleLogin
-        onSuccess={handleGoogleLogin}
-        onError={() => setError("Google login failed")}
-        useOneTap
-        theme="outline"
-        size="large"
-        shape="rectangular"
-        width="100%"
-      />
-    </div>
-  </div>
-</div>
+            {/* ✅ Google Login */}
+            <div className="flex flex-col items-center gap-4 mt-6">
+              <GoogleLogin
+                onSuccess={handleGoogleLogin}
+                onError={() => setError("Google login failed")}
+                useOneTap
+                theme="outline"
+                size="large"
+                shape="rectangular"
+              />
+            </div>
 
             {/* Register Button */}
             <button

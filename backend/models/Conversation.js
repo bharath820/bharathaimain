@@ -1,10 +1,20 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-const ConversationSchema = new mongoose.Schema({
-  title: { type: String, default: 'New Chat' },
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
+const messageSchema = new mongoose.Schema({
+  role: { type: String, enum: ["user", "assistant"], required: true },
+  content: String,
+  imageUrl: String,
+  isImage: { type: Boolean, default: false },
+  timestamp: { type: Date, default: Date.now }
 });
 
-export default mongoose.model('Conversation', ConversationSchema);
+const conversationSchema = new mongoose.Schema(
+  {
+    title: { type: String, default: "New Chat" },
+    messages: [messageSchema]
+  },
+  { timestamps: true }
+);
+
+const Conversation = mongoose.model("Conversation", conversationSchema);
+export default Conversation;
